@@ -1,0 +1,135 @@
+import { ApolloServer } from '@apollo/server'
+import { startStandaloneServer } from '@apollo/server/standalone'
+import { v4 as uuidv4 } from 'uuid'
+
+// Sample dataset
+type Author = {
+  id: string,
+  name: string,
+  age: number
+}
+
+type Book = {
+  id: string,
+  title: string,
+  authorId: string
+}
+
+let authors: Author[] = [
+  { id: "1", name: "J.K. Rowling", age: 60 },
+  { id: "2", name: "George R.R. Martin", age: 82 },
+  { id: "3", name: "J.R.R. Tolkien", age: 78 }
+]
+
+let books: Book[] = [
+  { id: "1", title: "Philosopher's Stone", authorId: "1" },
+  { id: "2", title: "Half-Blood Prince", authorId: "1" },
+  { id: "3", title: "Game of Thrones", authorId: "2" },
+  { id: "4", title: "Fellowship of the Ring", authorId: "3" },
+  { id: "5", title: "The Hobbit", authorId: "3" }
+]
+
+// Type Definitions
+const typeDefs = `#graphql
+  type Author {
+    id: ID!,
+    name: String,
+    age: Int,
+    books: [Book]
+  }
+
+  type Book {
+    id: ID!,
+    title: String,
+    author: Author
+  }
+
+  type Query {
+    authors: [Author],
+    books: [Book]
+  }
+
+  type Mutation {
+    createAuthor(name: String, age: Int): Author
+    updateAuthor(id: ID, name: String, age: Int): Author
+    deleteAuthor(id: ID): String
+    createBook(title: String, authorId: String): Book
+    updateBook(id: ID, title: String): Book
+    deleteBook(id: ID): String
+  }
+`
+
+// Resolvers
+const resolvers = {
+  Query: {
+    authors: () => authors,
+    books: () => books
+  },
+  Author: {
+    books: (parent: { id: String }) =>
+      books.filter(book => book.authorId === parent.id)
+  },
+  Book: {
+    author: (parent: { authorId: String }) =>
+      authors.find(author => author.id === parent.authorId)
+  },
+  Mutation: {
+    createAuthor: (_: unknown, { name, age }: Omit<Author, 'id'>) => {
+      const newAuthor = {
+        id: uuidv4(),
+        name,
+        age
+      }
+      authors.push(newAuthor)
+      return newAuthor
+    },
+    updateAuthor: (_: unknown, { id, name, age }: Partial<Author>) => {
+      const author = authors.find(author => author.id === id)
+      if (!author) return "No author found"
+      if (name) author.name = name
+      if (age) author.age = age
+      return author
+    },
+    deleteAuthor: (_: unknown, { id }: { id: string }) => {
+      const foundIndex = authors.findIndex(author => author.id === id)
+      if (foundIndex === -1) return "No author found"
+      authors.splice(foundIndex, 1)
+      return "Author deleted successfully"
+    },
+    createBook: (_: unknown, { title, authorId }: Omit<Book, 'id'>) => {
+      const newBook = {
+        id: uuidv4(),
+        title,
+        authorId
+      }
+      books.push(newBook)
+      return newBook
+    },
+    updateBook: (_: unknown, { id, title }: Partial<Book>) => {
+      const book = books.find(book => book.id === id)
+      if (!book) return "No book found"
+      if (title) book.title = title
+      return book
+    },
+    deleteBook: (_: unknown, { id }: { id: string }) => {
+      const foundIndex = books.findIndex(book => book.id === id)
+      if (foundIndex === -1) return "No book found"
+      books.splice(foundIndex, 1)
+      return "Book deleted successfully"
+    },
+  }
+}
+
+// Create Apollo Server
+const server = new ApolloServer({
+  typeDefs,
+  resolvers
+})
+
+// Start Apollo Server
+const startServer = async () => {
+  const { url } = await startStandaloneServer(server)
+  console.log(`Server is running on ${url}...`)
+}
+
+startServer()
