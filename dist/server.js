@@ -11,72 +11,124 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const server_1 = require("@apollo/server");
 const standalone_1 = require("@apollo/server/standalone");
-// Sample dataset
-let students = [
-    { id: "1", fullname: "John Smith" },
-    { id: "2", fullname: "Jane Doe" },
-    { id: "3", fullname: "Charlie Chaplin" },
-    { id: "4", fullname: "Joe Moe" },
-    { id: "5", fullname: "Jack Daniels" }
+const uuid_1 = require("uuid");
+let users = [
+    { id: "1", firstname: "John", lastname: "Smith", email: "john@mail.com" },
+    { id: "2", firstname: "Jane", lastname: "Doe", email: "jane@mail.com" },
+    { id: "3", firstname: "Joe", lastname: "Moe", email: "joe@mail.com" },
 ];
-let courses = [
-    { id: "1", courseName: "WAD" },
-    { id: "2", courseName: "UI/UX" },
-    { id: "3", courseName: "Digital Marketing" }
-];
-let enrolments = [
-    { id: "1", studentId: "1", courseId: "3" },
-    { id: "2", studentId: "2", courseId: "1" },
-    { id: "3", studentId: "3", courseId: "1" },
-    { id: "4", studentId: "4", courseId: "2" },
-    { id: "5", studentId: "5", courseId: "3" }
+let todos = [
+    { id: "1", userId: "2", text: "Water garden", completed: false },
+    { id: "2", userId: "1", text: "Mop floor", completed: true },
+    { id: "3", userId: "2", text: "Clean dishes", completed: false },
+    { id: "4", userId: "3", text: "Feed cat", completed: true },
+    { id: "5", userId: "1", text: "Walk dog", completed: false }
 ];
 // Type Definitions
 const typeDefs = `#graphql
-  type Student {
+  type User {
     id: ID!,
-    fullname: String,
-    courses: [Course]
+    firstname: String,
+    lastname: String,
+    email: String,
+    todos: [Todo]
   }
 
-  type Course {
+  type Todo {
     id: ID!,
-    courseName: String,
-    students: [Student]
-  }
-
-  type Enrolment {
-    id: ID!,
-    student: Student,
-    course: Course
+    text: String,
+    user: User,
+    completed: Boolean
   }
 
   type Query {
-    students: [Student],
-    courses: [Course],
-    enrolments: [Enrolment]
+    users: [User],
+    todos: [Todo],
+    getUserById(id: ID): User,
+    getCompletedTodos: [Todo]
+  }
+
+  type Mutation {
+    createUser(firstname: String, lastname: String, email: String): User
+    updateUserById(id: ID, firstname: String, lastname: String, email: String): User
+    deleteUserById(id: String): String
+
+    createTodo(text: String, userId: String): Todo
+    updateTodoById(id: ID, text: String, completed: Boolean): Todo
+    deleteTodoById(id: String): String
   }
 `;
 // Resolvers
 const resolvers = {
     Query: {
-        students: () => students,
-        courses: () => courses,
-        enrolments: () => enrolments
+        users: () => users,
+        todos: () => todos,
+        getUserById: (_, { id }) => users.find(user => user.id == id),
+        getCompletedTodos: () => todos.filter(todo => todo.completed === true)
     },
-    Student: {
-        courses: (parent) => enrolments
-            .filter(enrolment => enrolment.studentId === parent.id)
-            .map(enrolment => courses.find(course => course.id === enrolment.courseId))
+    Todo: {
+        user: (parent) => users.find(user => user.id === parent.userId)
     },
-    Course: {
-        students: (parent) => enrolments
-            .filter(enrolment => enrolment.courseId === parent.id)
-            .map(enrolment => students.find(student => student.id === enrolment.studentId))
+    User: {
+        todos: (parent) => todos.filter(todo => todo.userId === parent.id)
     },
-    Enrolment: {
-        student: (parent) => students.find(student => student.id === parent.studentId),
-        course: (parent) => courses.find(course => course.id === parent.courseId),
+    Mutation: {
+        createUser: (_, { firstname, lastname, email }) => {
+            const newUser = {
+                id: (0, uuid_1.v4)(),
+                firstname,
+                lastname,
+                email
+            };
+            users.push(newUser);
+            return newUser;
+        },
+        updateUserById: (_, { id, firstname, lastname, email }) => {
+            const user = users.find(user => user.id === id);
+            if (!user)
+                return "Todo not found";
+            if (firstname)
+                user.firstname = firstname;
+            if (lastname)
+                user.lastname = lastname;
+            if (email)
+                user.email = email;
+            return user;
+        },
+        deleteUserById: (_, { id }) => {
+            const foundIndex = users.findIndex(user => user.id === id);
+            if (foundIndex === -1)
+                return "User not found";
+            users.splice(foundIndex, 1);
+            return "User was deleted successfully";
+        },
+        createTodo: (_, { text, userId }) => {
+            const newTodo = {
+                id: (0, uuid_1.v4)(),
+                userId,
+                text,
+                completed: false
+            };
+            todos.push(newTodo);
+            return newTodo;
+        },
+        updateTodoById: (_, { id, text, completed }) => {
+            const todo = todos.find(todo => todo.id === id);
+            if (!todo)
+                return "Todo not found";
+            if (text)
+                todo.text = text;
+            if (completed)
+                todo.completed = completed;
+            return todo;
+        },
+        deleteTodoById: (_, { id }) => {
+            const foundIndex = todos.findIndex(todo => todo.id === id);
+            if (foundIndex === -1)
+                return "Todo not found";
+            todos.splice(foundIndex, 1);
+            return "Todo was deleted successfully";
+        }
     }
 };
 // Create Apollo Server
