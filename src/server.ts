@@ -55,14 +55,46 @@ const typeDefs = `#graphql
     getCompletedTodos: [Todo]
   }
 
-  type Mutation {
-    createUser(firstname: String, lastname: String, email: String): User
-    updateUserById(id: ID, firstname: String, lastname: String, email: String): User
-    deleteUserById(id: String): String
+  input CreateUserInput {
+    firstname: String
+    lastname: String
+    email: String
+  }
 
-    createTodo(text: String, userId: String): Todo
-    updateTodoById(id: ID, text: String, completed: Boolean): Todo
-    deleteTodoById(id: String): String
+  input UpdateUserInput {
+    id: ID!
+    firstname: String
+    lastname: String
+    email: String
+  }
+
+  input DeleteUserInput {
+    id: ID!
+  }
+
+  input CreateTodoInput {
+    userId: ID!
+    text: String!
+  }
+
+  input UpdateTodoInput {
+    id: ID!
+    text: String
+    completed: Boolean
+  }
+
+  input DeleteTodoInput {
+    id: ID!
+  }
+
+  type Mutation {
+    createUser(data: CreateUserInput!): User
+    updateUserById(data: UpdateUserInput!): User
+    deleteUserById(data: DeleteUserInput!): String
+
+    createTodo(data: CreateTodoInput!): Todo
+    updateTodoById(data: UpdateTodoInput!): Todo
+    deleteTodoById(data: DeleteTodoInput!): String
   }
 `
 
@@ -85,49 +117,62 @@ const resolvers = {
       todos.filter(todo => todo.userId === parent.id)
   },
   Mutation: {
-    createUser: (_: unknown, { firstname, lastname, email }: Omit<User, 'id'>) => {
+    createUser: (_: unknown, { data }: { data: Omit<User, 'id'> }) => {
       const newUser = {
         id: uuidv4(),
-        firstname,
-        lastname,
-        email
+        firstname: data.firstname,
+        lastname: data.lastname,
+        email: data.email
       }
       users.push(newUser)
       return newUser
     },
-    updateUserById: (_: unknown, { id, firstname, lastname, email }: Partial<User>): User | string => {
-      const user = users.find(user => user.id === id)
-      if (!user) return "Todo not found"
-      if (firstname) user.firstname = firstname
-      if (lastname) user.lastname = lastname
-      if (email) user.email = email
-      return user
-    },
-    deleteUserById: (_: unknown, { id }: { id: string }) => {
+    updateUserById: (_: unknown, { data }: { data: Partial<User> & { id: string } }): User | string => {
+      const { id, firstname, lastname, email } = data
       const foundIndex = users.findIndex(user => user.id === id)
+      if (foundIndex === -1) return "User not found"
+
+      users[foundIndex] = {
+        ...users[foundIndex],
+        firstname: firstname ?? users[foundIndex].firstname,
+        lastname: lastname ?? users[foundIndex].lastname,
+        email: email ?? users[foundIndex].email
+      }
+      return users[foundIndex]
+    },
+    deleteUserById: (_: unknown, { data }: { data: { id: string } }) => {
+      const foundIndex = users.findIndex(user => user.id === data.id)
       if (foundIndex === -1) return "User not found"
       users.splice(foundIndex, 1)
       return "User was deleted successfully"
     },
-    createTodo: (_: unknown, { text, userId }: Todo) => {
-      const newTodo = {
+
+    createTodo: (_: unknown, { data }: { data: Omit<Todo, 'id' | 'completed'> }) => {
+      const newTodo: Todo = {
         id: uuidv4(),
-        userId,
-        text,
+        text: data.text!,
+        userId: data.userId!,
         completed: false
       }
       todos.push(newTodo)
       return newTodo
     },
-    updateTodoById: (_: unknown, { id, text, completed }: Partial<Todo>): Todo | string => {
-      const todo = todos.find(todo => todo.id === id)
-      if (!todo) return "Todo not found"
-      if (text) todo.text = text
-      if (completed) todo.completed = completed
-      return todo
-    },
-    deleteTodoById: (_: unknown, { id }: { id: string }) => {
+
+    updateTodoById: (_: unknown, { data }: { data: Partial<Todo> & { id: string } }): Todo | string => {
+      const { id, text, completed } = data
       const foundIndex = todos.findIndex(todo => todo.id === id)
+      if (foundIndex === -1) return "Todo not found"
+
+      todos[foundIndex] = {
+        ...todos[foundIndex],
+        text: text ?? todos[foundIndex].text,
+        completed: completed ?? todos[foundIndex].completed
+      }
+      return todos[foundIndex]
+    },
+
+    deleteTodoById: (_: unknown, { data }: { data: { id: string } }) => {
+      const foundIndex = todos.findIndex(todo => todo.id === data.id)
       if (foundIndex === -1) return "Todo not found"
       todos.splice(foundIndex, 1)
       return "Todo was deleted successfully"
